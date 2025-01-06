@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Feed with Dynamic Token</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        .video-container {
+            max-width: 800px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+        }
+        video {
+            width: 100%;
+            display: block;
+        }
+        .duration {
+            position: absolute;
+            bottom: 40px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .progress-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: rgba(0,0,0,0.5);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 2px;
+            position: relative;
+        }
+        .progress-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            background: #fff;
+            border-radius: 2px;
+        }
+        .time-display {
+            position: absolute;
+            color: white;
+            font-size: 12px;
+            left: 10px;
+            bottom: 35px;
+            background: rgba(0,0,0,0.7);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .loading-placeholder {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="videos"></div>
+
+    <script>
+        async function fetchRecentVideos() {
+            const response = await fetch(`http://localhost:3000/proxy?url=${encodeURIComponent('https://t.me/s/denazi_UA')}`);
+            const html = await response.text();
+            const videoMatches = [...html.matchAll(/(?:video|source)[^>]+src="(https:\/\/cdn[0-9]*\.cdn-telegram\.org\/file\/[^\"]+)"/gi)];
+            return videoMatches.slice(0, 3).map(match => match[1]); // Get the first 3 videos
+        }
+
+        async function loadVideos() {
+            try {
+                const videosContainer = document.getElementById('videos');
+                const videoUrls = await fetchRecentVideos();
+                videoUrls.forEach((url, index) => {
+                    const videoContainer = document.createElement('div');
+                    videoContainer.className = 'video-container';
+
+                    const videoWrapper = document.createElement('div');
+                    videoWrapper.className = 'video-wrapper';
+
+                    const video = document.createElement('video');
+                    video.id = `video${index + 1}`;
+                    video.src = url;
+                    video.controls = true;
+                    video.loop = true;
+                    video.autoplay = index === 0; // Autoplay the first video
+
+                    videoWrapper.appendChild(video);
+                    videoContainer.appendChild(videoWrapper);
+                    videosContainer.appendChild(videoContainer);
+                });
+
+                setupVideoObservers();
+            } catch (error) {
+                console.error('Error loading videos:', error);
+            }
+        }
+
+        function setupVideoObservers() {
+            const videos = document.querySelectorAll('video');
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const video = entry.target;
+                    if (entry.isIntersecting) {
+                        video.play();
+                        videos.forEach(v => {
+                            if (v !== video) {
+                                v.pause();
+                            }
+                        });
+                    } else {
+                        video.pause();
+                    }
+                });
+            }, {
+                threshold: 0.5
+            });
+
+            videos.forEach(video => observer.observe(video));
+        }
+
+        loadVideos();
+    </script>
+</body>
+</html>
