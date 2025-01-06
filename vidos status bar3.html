@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Telegram Video Player</title>
+    <style>
+        .video-container { max-width: 800px; margin: 20px auto; }
+        video { width: 100%; }
+        .error { color: red; padding: 10px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="video-container">
+        <video id="mainVideo" controls></video>
+        <div id="errorMsg" class="error"></div>
+    </div>
+
+    <script>
+    class TelegramVideoPlayer {
+        constructor(videoId, messageId) {
+            this.videoId = videoId;
+            this.messageId = messageId;
+            this.videoEl = document.getElementById(videoId);
+            this.errorEl = document.getElementById('errorMsg');
+            this.currentToken = null;
+            this.retryTimeout = 1000;
+            this.init();
+        }
+
+        async init() {
+            await this.updateToken();
+            // Check token every 4 hours
+            setInterval(() => this.updateToken(), 30 * 1000); // Check every 30 seconds for testing
+        }
+
+        async updateToken() {
+            try {
+                const newUrl = await this.getVideoUrl();
+                if (newUrl && newUrl !== this.videoEl.src) {
+                    const currentTime = this.videoEl.currentTime;
+                    const wasPlaying = !this.videoEl.paused;
+                    this.videoEl.src = newUrl;
+                    this.videoEl.currentTime = currentTime;
+                    if (wasPlaying) this.videoEl.play();
+                    this.retryTimeout = 1000; // Reset retry timeout
+                    this.errorEl.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error updating token:', error);
+                this.errorEl.textContent = 'Error loading video. Retrying...';
+                this.errorEl.style.display = 'block';
+                // Exponential backoff for retries
+                setTimeout(() => this.updateToken(), this.retryTimeout);
+                this.retryTimeout = Math.min(this.retryTimeout * 2, 60000);
+            }
+        }
+
+        async getVideoUrl() {
+            const response = await fetch(`http://localhost:3000/proxy?url=${encodeURIComponent(`https://t.me/s/denazi_UA/${this.messageId}`)}`);
+            const html = await response.text();
+            console.log('Response status:', response.status);
+            const videoMatch = html.match(/(?:video|source)[^>]+src="(https:\/\/cdn[0-9]*.cdn-telegram\.org\/file\/[^"]+)"/i);
+            if (!videoMatch) {
+                console.log('Full HTML:', html);
+                throw new Error('Video URL not found');
+            }
+            return videoMatch[1];
+        }
+    }
+
+    // Initialize player with message ID
+    new TelegramVideoPlayer('mainVideo', '83617');
+    </script>
+</body>
+</html>
